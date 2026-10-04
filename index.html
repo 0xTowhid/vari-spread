@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variational Spreads</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{--bg:#eef2f5;--panel:#fff;--ink:#14212b;--mute:#667785;--line:#d9e1e7;--accent:#0b6e8a;--good:#12805c;--mid:#a86a00;--bad:#c0392b}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1a22;--panel:#16242e;--ink:#e6eef3;--mute:#8aa0ae;--line:#26394640;--accent:#4fc3e0;--good:#4cc79a;--mid:#e0a84a;--bad:#ef7a6c}}
+:root[data-theme=dark]{--bg:#0f1a22;--panel:#16242e;--ink:#e6eef3;--mute:#8aa0ae;--line:#263946;--accent:#4fc3e0;--good:#4cc79a;--mid:#e0a84a;--bad:#ef7a6c}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,sans-serif;padding:24px clamp(12px,3vw,40px)}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between;margin-bottom:16px}
+h1{font-size:clamp(24px,4vw,34px);margin:0;letter-spacing:-.02em}
+.sub{color:var(--mute);font-size:13px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px;min-width:150px}
+.stat b{display:block;font:600 18px "JetBrains Mono",monospace}
+.stat span{color:var(--mute);font-size:12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+input,select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+input[type=search]{flex:1;min-width:180px;max-width:320px}
+button{cursor:pointer}button:hover{border-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.live{display:inline-flex;align-items:center;gap:6px;color:var(--mute);font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mute)}
+.dot.on{background:var(--good)}.dot.err{background:var(--bad)}
+.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{padding:8px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{position:sticky;top:0;background:var(--panel);color:var(--mute);font-weight:600;font-size:12.5px;cursor:pointer;user-select:none}
+th[aria-sort]{color:var(--accent)}
+td{font:400 13.5px "JetBrains Mono",monospace}
+td:first-child{font:600 14px "Instrument Sans",sans-serif}
+td small{color:var(--mute);font-family:"Instrument Sans",sans-serif;font-weight:400;margin-left:6px}
+.good{color:var(--good)}.mid{color:var(--mid)}.bad{color:var(--bad)}.na{color:var(--mute)}
+#msg{padding:14px;color:var(--bad);display:none;background:var(--panel);border:1px solid var(--bad);border-radius:6px;margin-bottom:12px;font-size:14px}
+#msg code{font-family:"JetBrains Mono",monospace;font-size:12.5px}
+.foot{color:var(--mute);font-size:12.5px;margin-top:12px;max-width:80ch}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Variational spreads</h1>
+    <div class="sub">Buy price, sell price and spread for every listed market.</div>
+  </div>
+  <div class="live"><span class="dot" id="dot"></span><span id="status">Connecting…</span></div>
+</header>
+
+<div class="stats" id="stats"></div>
+<div id="msg" role="alert"></div>
+
+<div class="bar">
+  <input type="search" id="q" placeholder="Filter by ticker or name" aria-label="Filter markets">
+  <select id="size" aria-label="Trade size"><option value="size_1k">Size $1k</option><option value="size_100k">Size $100k</option><option value="size_1m">Size $1M</option></select>
+  <select id="mode" aria-label="Spread type"><option value="half">Spread as shown in app</option><option value="full">Full bid–ask spread</option></select>
+  <select id="refresh" aria-label="Refresh interval"><option value="0">Manual refresh</option><option value="15000" selected>Every 15 s</option><option value="30000">Every 30 s</option><option value="60000">Every 60 s</option></select>
+  <button id="go">Refresh now</button>
+  <button id="theme" aria-label="Toggle theme">Theme</button>
+</div>
+
+<div class="wrap">
+<table>
+  <thead><tr id="head"></tr></thead>
+  <tbody id="body"></tbody>
+</table>
+</div>
+
+<p class="foot">Buy is the ask and Sell is the bid for the chosen trade size. "Spread as shown in app" is half the bid–ask gap divided by the mid price, which reproduces the app's 0.033% on 787.938 / 787.412. Full spread is double that. Quotes can be cached up to 10 minutes. The $1M size exists for major assets only. Rate limit: 10 requests per 10 seconds.</p>
+
+<script>
+const API = "https://omni-client-api.prod.ap-northeast-1.variational.io/metadata/stats";
+const LIM = {size_1k:[0.02,0.05], size_100k:[0.03,0.1], size_1m:[0.06,0.2]};
+let rows=[], sortKey="sp", sortDir=1, timer=null, general={};
+const $=id=>document.getElementById(id);
+const num=v=>{const n=parseFloat(v);return isFinite(n)?n:null};
+function fullPct(q){
+  if(!q) return null;
+  const b=num(q.bid),a=num(q.ask);
+  return (b===null||a===null||a+b===0)?null:(a-b)/((a+b)/2)*100;
+}
+function compact(n){
+  if(n===null) return "–";
+  const a=Math.abs(n);
+  if(a>=1e9) return "$"+(n/1e9).toFixed(2)+"B";
+  if(a>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
+  if(a>=1e3) return "$"+(n/1e3).toFixed(1)+"K";
+  return "$"+n.toFixed(0);
+}
+function price(n){
+  if(n===null) return "–";
+  const d=n>=1000?2:n>=1?4:n>=0.01?5:8;
+  return n.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+}
+function ageStr(s){
+  if(s===null) return "–";
+  return s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":(s/3600).toFixed(1)+"h";
+}
+function parse(data){
+  const now=Date.now();
+  return data.listings.map(l=>{
+    const q=l.quotes||{};
+    const t=q.updated_at?Date.parse(q.updated_at.replace(/(\.\d{3})\d+/,"$1")):NaN;
+    return {ticker:l.ticker,name:l.name||"",q,mark:num(l.mark_price),vol:num(l.volume_24h),
+      age:isNaN(t)?null:Math.max(0,(now-t)/1000)};
+  });
+}
+function recompute(){
+  const sz=$("size").value, k=$("mode").value==="half"?0.5:1;
+  const f=x=>{const s=fullPct(x);return s===null?null:s*k};
+  rows.forEach(r=>{
+    const q=r.q[sz];
+    r.buy=q?num(q.ask):null; r.sell=q?num(q.bid):null;
+    r.sp=f(q); r.p1k=f(r.q.size_1k); r.p100k=f(r.q.size_100k); r.p1m=f(r.q.size_1m);
+  });
+}
+function cols(){
+  const z=$("size").selectedOptions[0].text.replace("Size ","");
+  return [["ticker","Asset"],["buy","Buy"],["sell","Sell"],["sp","Spread @ "+z],
+    ["p1k","$1k"],["p100k","$100k"],["p1m","$1M"],["mark","Mark price"],["vol","24h volume"],["age","Quote age"]];
+}
+function renderHead(){
+  $("head").innerHTML=cols().map(([k,t])=>{
+    const on=k===sortKey;
+    return `<th data-k="${k}" tabindex="0"${on?` aria-sort="${sortDir>0?"ascending":"descending"}"`:""}>${t}${on?(sortDir>0?" ▲":" ▼"):""}</th>`;
+  }).join("");
+}
+function pc(v,lim){
+  const k=$("mode").value==="half"?1:2;
+  const c=v===null?"na":v<=lim[0]*k?"good":v<=lim[1]*k?"mid":"bad";
+  return `<td class="${c}">${v===null?"–":v.toFixed(3)+"%"}</td>`;
+}
+function render(){
+  const f=$("q").value.trim().toLowerCase(), sz=$("size").value;
+  const list=rows.filter(r=>!f||r.ticker.toLowerCase().includes(f)||r.name.toLowerCase().includes(f));
+  list.sort((a,b)=>{
+    const x=a[sortKey],y=b[sortKey];
+    if(typeof x==="string") return x.localeCompare(y)*sortDir;
+    if(x===null&&y===null) return 0;
+    if(x===null) return 1;
+    if(y===null) return -1;
+    return (x-y)*sortDir;
+  });
+  $("body").innerHTML=list.map(r=>`<tr>
+    <td>${r.ticker}<small>${r.name}</small></td>
+    <td>${price(r.buy)}</td><td>${price(r.sell)}</td>
+    ${pc(r.sp,LIM[sz])}${pc(r.p1k,LIM.size_1k)}${pc(r.p100k,LIM.size_100k)}${pc(r.p1m,LIM.size_1m)}
+    <td>${price(r.mark)}</td><td>${compact(r.vol)}</td>
+    <td class="${r.age!==null&&r.age>600?"bad":""}">${ageStr(r.age)}</td></tr>`).join("")
+    ||`<tr><td colspan="10" class="na">No markets match “${$("q").value}”.</td></tr>`;
+  renderHead();
+}
+function renderStats(){
+  const v=rows.filter(r=>r.sp!==null).sort((a,b)=>a.sp-b.sp);
+  const med=v.length?v[Math.floor(v.length/2)].sp:null;
+  const items=[[rows.length,"markets loaded"],
+    [med===null?"–":med.toFixed(3)+"%","median spread"],
+    [v.length?`${v[0].ticker} ${v[0].sp.toFixed(3)}%`:"–","tightest"],
+    [v.length?`${v[v.length-1].ticker} ${v[v.length-1].sp.toFixed(3)}%`:"–","widest"],
+    [compact(num(general.total_volume_24h)),"24h volume"]];
+  $("stats").innerHTML=items.map(([a,l])=>`<div class="stat"><b>${a}</b><span>${l}</span></div>`).join("");
+}
+function setStatus(kind,text){$("dot").className="dot "+kind;$("status").textContent=text}
+function refreshView(){recompute();renderStats();render()}
+async function load(){
+  $("msg").style.display="none"; setStatus("","Loading…");
+  try{
+    const res=await fetch(API,{cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status+(res.status===429?" (rate limited, slow down)":""));
+    general=await res.json(); rows=parse(general); refreshView();
+    setStatus("on","Live · updated "+new Date().toLocaleTimeString());
+  }catch(e){
+    setStatus("err","Fetch failed");
+    $("msg").style.display="block";
+    $("msg").innerHTML=`Could not load <code>/metadata/stats</code>: ${e.message}. If this is a CORS or network error, open this file from a normal browser tab (not a sandboxed preview), or route the request through your own proxy by changing the <code>API</code> constant at the top of the script.`;
+  }
+}
+function schedule(){clearInterval(timer);const ms=+$("refresh").value;if(ms)timer=setInterval(load,ms)}
+$("head").addEventListener("click",e=>{
+  const th=e.target.closest("th"); if(!th) return;
+  const k=th.dataset.k;
+  if(k===sortKey) sortDir*=-1; else {sortKey=k;sortDir=1}
+  render();
+});
+$("head").addEventListener("keydown",e=>{if(e.key==="Enter")e.target.click()});
+$("q").addEventListener("input",render);
+$("size").addEventListener("change",refreshView);
+$("mode").addEventListener("change",refreshView);
+$("go").addEventListener("click",load);
+$("refresh").addEventListener("change",schedule);
+$("theme").addEventListener("click",()=>{
+  const r=document.documentElement;
+  const dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
+  r.dataset.theme=dark?"light":"dark";
+});
+renderHead(); load(); schedule();
+</script>
+</body>
+</html>
