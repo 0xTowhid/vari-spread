@@ -2,80 +2,148 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Variational Spreads</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Variational Spreads &amp; OI</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-:root{--bg:#eef2f5;--panel:#fff;--ink:#14212b;--mute:#667785;--line:#d9e1e7;--accent:#0b6e8a;--good:#12805c;--mid:#a86a00;--bad:#c0392b}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1a22;--panel:#16242e;--ink:#e6eef3;--mute:#8aa0ae;--line:#26394640;--accent:#4fc3e0;--good:#4cc79a;--mid:#e0a84a;--bad:#ef7a6c}}
-:root[data-theme=dark]{--bg:#0f1a22;--panel:#16242e;--ink:#e6eef3;--mute:#8aa0ae;--line:#263946;--accent:#4fc3e0;--good:#4cc79a;--mid:#e0a84a;--bad:#ef7a6c}
+:root{--bg:#eef2f5;--panel:#fff;--ink:#14212b;--mute:#667785;--line:#d9e1e7;--accent:#0b6e8a;--good:#12805c;--mid:#a86a00;--bad:#c0392b;--long:#12805c;--short:#c0392b}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1a22;--panel:#16242e;--ink:#e6eef3;--mute:#8aa0ae;--line:#263946;--accent:#4fc3e0;--good:#4cc79a;--mid:#e0a84a;--bad:#ef7a6c;--long:#4cc79a;--short:#ef7a6c}}
+:root[data-theme=dark]{--bg:#0f1a22;--panel:#16242e;--ink:#e6eef3;--mute:#8aa0ae;--line:#263946;--accent:#4fc3e0;--good:#4cc79a;--mid:#e0a84a;--bad:#ef7a6c;--long:#4cc79a;--short:#ef7a6c}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,sans-serif;padding:24px clamp(12px,3vw,40px)}
-header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between;margin-bottom:16px}
-h1{font-size:clamp(24px,4vw,34px);margin:0;letter-spacing:-.02em}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));max-width:1500px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:end;justify-content:space-between;margin-bottom:14px}
+h1{font-size:clamp(22px,5vw,34px);margin:0;letter-spacing:-.02em;line-height:1.15}
 .sub{color:var(--mute);font-size:13px}
-.stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px;min-width:150px}
-.stat b{display:block;font:600 18px "JetBrains Mono",monospace}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0}
+.stat b{display:block;font:600 clamp(15px,3.6vw,18px) "JetBrains Mono",monospace;overflow-wrap:anywhere}
 .stat span{color:var(--mute);font-size:12px}
+.tabs{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:12px;background:var(--panel)}
+.tabs button{border:0;border-radius:0;padding:9px 18px;background:none;font-weight:600;color:var(--mute)}
+.tabs button[aria-pressed=true]{background:var(--accent);color:#fff}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.chips{margin-bottom:4px}.chip{flex:none;border-radius:999px;padding:6px 13px;font-size:13.5px;min-height:36px}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip small{opacity:.7;margin-left:4px}
 .bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
-input,select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px}
-input[type=search]{flex:1;min-width:180px;max-width:320px}
+input,select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-height:40px}
+input[type=search]{flex:1 1 200px;min-width:0}
 button{cursor:pointer}button:hover{border-color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .live{display:inline-flex;align-items:center;gap:6px;color:var(--mute);font-size:13px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--mute)}
 .dot.on{background:var(--good)}.dot.err{background:var(--bad)}
-.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px}
-table{border-collapse:collapse;width:100%;min-width:760px}
+.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:900px}
 th,td{padding:8px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
-th:first-child,td:first-child{text-align:left}
-th{position:sticky;top:0;background:var(--panel);color:var(--mute);font-weight:600;font-size:12.5px;cursor:pointer;user-select:none}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--panel)}
+th:nth-child(2),td:nth-child(2){text-align:left}
+th{position:sticky;top:0;z-index:1;color:var(--mute);font-weight:600;font-size:12.5px;cursor:pointer;user-select:none;background:var(--panel)}
+th:first-child{z-index:2}
 th[aria-sort]{color:var(--accent)}
 td{font:400 13.5px "JetBrains Mono",monospace}
 td:first-child{font:600 14px "Instrument Sans",sans-serif}
 td small{color:var(--mute);font-family:"Instrument Sans",sans-serif;font-weight:400;margin-left:6px}
+.tag{font:600 11px "Instrument Sans",sans-serif;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mute)}
 .good{color:var(--good)}.mid{color:var(--mid)}.bad{color:var(--bad)}.na{color:var(--mute)}
+.ls{display:inline-block;width:80px;height:8px;border-radius:4px;background:var(--short);overflow:hidden;vertical-align:middle;margin-right:8px}
+.ls i{display:block;height:100%;background:var(--long)}
 #msg{padding:14px;color:var(--bad);display:none;background:var(--panel);border:1px solid var(--bad);border-radius:6px;margin-bottom:12px;font-size:14px}
 #msg code{font-family:"JetBrains Mono",monospace;font-size:12.5px}
 .foot{color:var(--mute);font-size:12.5px;margin-top:12px;max-width:80ch}
+#msort{display:none}
+@media (max-width:700px){
+  body{font-size:14.5px}
+  #msort{display:inline-block}
+  .bar select,.bar button{flex:1 1 calc(50% - 8px)}
+  .wrap{overflow:visible;background:none;border:0}
+  table{min-width:0;display:block}
+  thead{display:none}
+  tbody{display:grid;gap:8px}
+  tr{display:grid;grid-template-columns:1fr 1fr;gap:3px 16px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+  td,td:first-child,th:first-child{display:flex;justify-content:space-between;gap:8px;border:0;padding:2px 0;text-align:left;position:static;white-space:normal}
+  td:nth-child(2){text-align:left}
+  td::before{content:attr(data-label);color:var(--mute);font:600 11.5px "Instrument Sans",sans-serif}
+  td:first-child{grid-column:1/-1;font-size:16px;padding-bottom:4px}
+  td:first-child::before{display:none}
+}
 </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>Variational spreads</h1>
-    <div class="sub">Buy price, sell price and spread for every listed market.</div>
+    <h1>Variational spreads &amp; open interest</h1>
+    <div class="sub">Buy, sell, spread and OI for every listed market.</div>
   </div>
   <div class="live"><span class="dot" id="dot"></span><span id="status">Connecting…</span></div>
 </header>
 
+<div class="tabs" role="group" aria-label="View">
+  <button id="v-spread" aria-pressed="true">Spreads</button>
+  <button id="v-oi" aria-pressed="false">Open interest</button>
+</div>
+
 <div class="stats" id="stats"></div>
 <div id="msg" role="alert"></div>
+<div id="chips"></div>
 
 <div class="bar">
   <input type="search" id="q" placeholder="Filter by ticker or name" aria-label="Filter markets">
   <select id="size" aria-label="Trade size"><option value="size_1k">Size $1k</option><option value="size_100k">Size $100k</option><option value="size_1m">Size $1M</option></select>
-  <select id="mode" aria-label="Spread type"><option value="half">Spread as shown in app</option><option value="full">Full bid–ask spread</option></select>
-  <select id="refresh" aria-label="Refresh interval"><option value="0">Manual refresh</option><option value="15000" selected>Every 15 s</option><option value="30000">Every 30 s</option><option value="60000">Every 60 s</option></select>
-  <button id="go">Refresh now</button>
+  <select id="mode" aria-label="Spread type"><option value="half">Spread as in app</option><option value="full">Full bid–ask</option></select>
+  <select id="minoi" aria-label="Minimum open interest"><option value="0">Any OI</option><option value="10000">OI ≥ $10K</option><option value="100000">OI ≥ $100K</option><option value="1000000">OI ≥ $1M</option><option value="10000000">OI ≥ $10M</option></select>
+  <select id="msort" aria-label="Sort by"></select>
+  <select id="refresh" aria-label="Refresh interval"><option value="0">Manual</option><option value="15000" selected>Every 15 s</option><option value="30000">Every 30 s</option><option value="60000">Every 60 s</option></select>
+  <button id="go">Refresh</button>
   <button id="theme" aria-label="Toggle theme">Theme</button>
 </div>
 
-<div class="wrap">
-<table>
-  <thead><tr id="head"></tr></thead>
-  <tbody id="body"></tbody>
-</table>
-</div>
+<div class="wrap"><table><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div>
 
-<p class="foot">Buy is the ask and Sell is the bid for the chosen trade size. "Spread as shown in app" is half the bid–ask gap divided by the mid price, which reproduces the app's 0.033% on 787.938 / 787.412. Full spread is double that. Quotes can be cached up to 10 minutes. The $1M size exists for major assets only. Rate limit: 10 requests per 10 seconds.</p>
+<p class="foot">Buy = ask, Sell = bid for the chosen size. "Spread as in app" is half the bid–ask gap over mid (0.033% on 787.938 / 787.412); "Full bid–ask" is double. Quotes can be cached up to 10 minutes. $1M quotes exist for majors only. OI is shown in USD. The API has no group, type or sector fields, so these mirror the app by rule: TradFi markets are treated as SWAP and crypto as PERP, and sectors come from ticker lists. Edit <code>OVERRIDES</code> in the script to fix any asset. Rate limit: 10 requests per 10 seconds.</p>
 
 <script>
 const API = "https://omni-client-api.prod.ap-northeast-1.variational.io/metadata/stats";
 const LIM = {size_1k:[0.02,0.05], size_100k:[0.03,0.1], size_1m:[0.06,0.2]};
-let rows=[], sortKey="sp", sortDir=1, timer=null, general={};
+const SUBS = ["Infra","DeFi","AI","Meme","Commodities","Equities","Pre-IPO","Indices","ETF","FX","Other"];
+/* Force classification per ticker, e.g. { XAU:{sub:"Commodities"}, FOO:{grp:"Crypto",typ:"PERP",sub:"AI"} } */
+const OVERRIDES = {};
+const S = x => new Set(x.split(" "));
+const FX_T = S("EUR GBP JPY AUD CAD CHF NZD CNH MXN KRW INR TRY BRL SGD ZAR SEK NOK PLN HKD THB IDR");
+const COMM_T = S("XAU XAG XPT XPD PAXG XAUT GOLD SILVER OIL WTI BRENT COPPER NATGAS");
+const IDX_T = S("US100 US500 US30 SPX NDX DJI VIX DXI TWI");
+const ETF_T = S("SPY QQQ DIA IWM GLD SLV TLT");
+const PRE_T = S("OPENAI ANTHROPIC SPACEX XAI STRIPE DATABRICKS");
+const EQ_T = S("AAPL MSFT NVDA TSLA AMZN GOOGL GOOG META NFLX AMD INTC COIN MSTR HOOD PLTR CRCL ORCL AVGO");
+const TRAD_T = new Set([...IDX_T,...ETF_T,...PRE_T,...EQ_T]);
+const INFRA_T = S("BTC ETH SOL AVAX BNB ADA DOT NEAR ATOM SUI APT SEI TON TRX XRP LTC ARB OP POL INJ TIA LINK");
+const DEFI_T = S("UNI AAVE MKR CRV LDO COMP SNX HYPE PENDLE JUP ENA DYDX GMX SUSHI");
+const AI_T = S("TAO FET RENDER RNDR WLD VIRTUAL GRASS AKT ARKM AI16Z");
+const MEME_T = S("DOGE SHIB PEPE WIF BONK FLOKI TRUMP POPCAT MEW BRETT FARTCOIN PNUT");
+const COMM_RE = /\b(gold|silver|platinum|palladium|crude|oil|commodity|copper)\b/i;
+const FX_RE = /\b(forex|euro|yen|pound sterling|swiss franc|peso|rupee|lira|yuan|krona)\b/i;
+const IDX_RE = /\b(index|s&p|nasdaq|dow jones)\b/i;
+const EQ_RE = /\b(inc|corp|corporation|ltd|plc|holdings)\b\.?/i;
+function categorize(t,n){
+  const o=OVERRIDES[t]||{};
+  const tok=/token|tether|paxos/i.test(n)||t==="PAXG"||t==="XAUT";
+  const trad=TRAD_T.has(t)||FX_T.has(t)||FX_RE.test(n)||IDX_RE.test(n)||EQ_RE.test(n)||/\betf\b|pre[- ]?ipo|treasury/i.test(n)||(!tok&&(COMM_T.has(t)||COMM_RE.test(n)));
+  const grp=o.grp||(trad?"TradFi":"Crypto");
+  const typ=o.typ||(grp==="TradFi"?"SWAP":"PERP");
+  const sub=o.sub||(
+    PRE_T.has(t)||/pre[- ]?ipo/i.test(n)?"Pre-IPO":
+    ETF_T.has(t)||/\betf\b/i.test(n)?"ETF":
+    IDX_T.has(t)||IDX_RE.test(n)?"Indices":
+    FX_T.has(t)||FX_RE.test(n)?"FX":
+    COMM_T.has(t)||COMM_RE.test(n)?"Commodities":
+    EQ_T.has(t)||EQ_RE.test(n)?"Equities":
+    MEME_T.has(t)?"Meme":AI_T.has(t)?"AI":DEFI_T.has(t)?"DeFi":INFRA_T.has(t)?"Infra":
+    grp==="TradFi"?"Equities":"Other");
+  return {grp,typ,sub,cat:typ+" "+s0(sub)};
+}
+const s0=x=>x;
+let rows=[], view="spread", grp="All", typ="All", sub="All", sortKey="sp", sortDir=1, timer=null, general={};
 const $=id=>document.getElementById(id);
 const num=v=>{const n=parseFloat(v);return isFinite(n)?n:null};
 function fullPct(q){
@@ -85,28 +153,27 @@ function fullPct(q){
 }
 function compact(n){
   if(n===null) return "–";
-  const a=Math.abs(n);
-  if(a>=1e9) return "$"+(n/1e9).toFixed(2)+"B";
-  if(a>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
-  if(a>=1e3) return "$"+(n/1e3).toFixed(1)+"K";
-  return "$"+n.toFixed(0);
+  const a=Math.abs(n), s=n<0?"-":"";
+  if(a>=1e9) return s+"$"+(a/1e9).toFixed(2)+"B";
+  if(a>=1e6) return s+"$"+(a/1e6).toFixed(2)+"M";
+  if(a>=1e3) return s+"$"+(a/1e3).toFixed(1)+"K";
+  return s+"$"+a.toFixed(0);
 }
 function price(n){
   if(n===null) return "–";
   const d=n>=1000?2:n>=1?4:n>=0.01?5:8;
   return n.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 }
-function ageStr(s){
-  if(s===null) return "–";
-  return s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":(s/3600).toFixed(1)+"h";
-}
+const ageStr=s=>s===null?"–":s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":(s/3600).toFixed(1)+"h";
 function parse(data){
   const now=Date.now();
   return data.listings.map(l=>{
-    const q=l.quotes||{};
+    const q=l.quotes||{}, o=l.open_interest||{};
     const t=q.updated_at?Date.parse(q.updated_at.replace(/(\.\d{3})\d+/,"$1")):NaN;
-    return {ticker:l.ticker,name:l.name||"",q,mark:num(l.mark_price),vol:num(l.volume_24h),
-      age:isNaN(t)?null:Math.max(0,(now-t)/1000)};
+    const lo=num(o.long_open_interest)||0, so=num(o.short_open_interest)||0, tot=lo+so;
+    return {ticker:l.ticker,name:l.name||"",...categorize(l.ticker,l.name||""),q,
+      mark:num(l.mark_price),vol:num(l.volume_24h),lo,so,oi:tot,net:lo-so,
+      lp:tot>0?lo/tot*100:null,age:isNaN(t)?null:Math.max(0,(now-t)/1000)};
   });
 }
 function recompute(){
@@ -120,23 +187,40 @@ function recompute(){
 }
 function cols(){
   const z=$("size").selectedOptions[0].text.replace("Size ","");
-  return [["ticker","Asset"],["buy","Buy"],["sell","Sell"],["sp","Spread @ "+z],
-    ["p1k","$1k"],["p100k","$100k"],["p1m","$1M"],["mark","Mark price"],["vol","24h volume"],["age","Quote age"]];
+  return view==="spread"
+   ? [["ticker","Asset"],["cat","Type"],["buy","Buy"],["sell","Sell"],["sp","Spread @ "+z],["p1k","$1k"],["p100k","$100k"],["p1m","$1M"],["mark","Mark"],["vol","24h vol"],["age","Quote age"]]
+   : [["ticker","Asset"],["cat","Type"],["oi","Total OI"],["lo","Long OI"],["so","Short OI"],["net","Net long"],["lp","Long share"],["mark","Mark"],["vol","24h vol"]];
+}
+function visible(){
+  const f=$("q").value.trim().toLowerCase(), m=+$("minoi").value;
+  return rows.filter(r=>(grp==="All"||r.grp===grp)&&(typ==="All"||r.typ===typ)&&(sub==="All"||r.sub===sub)&&r.oi>=m&&(!f||r.ticker.toLowerCase().includes(f)||r.name.toLowerCase().includes(f)));
+}
+function renderChips(){
+  const base=rows.filter(r=>(grp==="All"||r.grp===grp)&&(typ==="All"||r.typ===typ));
+  const subs=["All",...SUBS].filter(x=>x==="All"||base.some(r=>r.sub===x));
+  if(!subs.includes(sub)) sub="All";
+  const row=(k,label,items,cur,count)=>`<div class="chips" role="group" aria-label="${label}">${items.map(([v,t])=>`<button class="chip" data-k="${k}" data-c="${v}" aria-pressed="${v===cur}">${t}<small>${count(v)}</small></button>`).join("")}</div>`;
+  $("chips").innerHTML=
+    row("g","Market group",[["All","All Markets"],["Crypto","Crypto"],["TradFi","TradFi"]],grp,v=>rows.filter(r=>v==="All"||r.grp===v).length)+
+    row("t","Contract type",[["All","All"],["PERP","PERP"],["SWAP","SWAP"]],typ,v=>rows.filter(r=>(grp==="All"||r.grp===grp)&&(v==="All"||r.typ===v)).length)+
+    row("s","Sector",subs.map(x=>[x,x]),sub,v=>base.filter(r=>v==="All"||r.sub===v).length);
 }
 function renderHead(){
-  $("head").innerHTML=cols().map(([k,t])=>{
+  const c=cols();
+  $("head").innerHTML=c.map(([k,t])=>{
     const on=k===sortKey;
     return `<th data-k="${k}" tabindex="0"${on?` aria-sort="${sortDir>0?"ascending":"descending"}"`:""}>${t}${on?(sortDir>0?" ▲":" ▼"):""}</th>`;
   }).join("");
+  $("msort").innerHTML=c.map(([k,t])=>`<option value="${k}"${k===sortKey?" selected":""}>Sort: ${t} ${k===sortKey?(sortDir>0?"↑":"↓"):""}</option>`).join("");
 }
-function pc(v,lim){
+function pc(l,v,lim){
   const k=$("mode").value==="half"?1:2;
   const c=v===null?"na":v<=lim[0]*k?"good":v<=lim[1]*k?"mid":"bad";
-  return `<td class="${c}">${v===null?"–":v.toFixed(3)+"%"}</td>`;
+  return `<td data-label="${l}" class="${c}">${v===null?"–":v.toFixed(3)+"%"}</td>`;
 }
+const T=(l,v,c="")=>`<td data-label="${l}"${c?` class="${c}"`:""}>${v}</td>`;
 function render(){
-  const f=$("q").value.trim().toLowerCase(), sz=$("size").value;
-  const list=rows.filter(r=>!f||r.ticker.toLowerCase().includes(f)||r.name.toLowerCase().includes(f));
+  const sz=$("size").value, list=visible();
   list.sort((a,b)=>{
     const x=a[sortKey],y=b[sortKey];
     if(typeof x==="string") return x.localeCompare(y)*sortDir;
@@ -145,27 +229,35 @@ function render(){
     if(y===null) return -1;
     return (x-y)*sortDir;
   });
-  $("body").innerHTML=list.map(r=>`<tr>
-    <td>${r.ticker}<small>${r.name}</small></td>
-    <td>${price(r.buy)}</td><td>${price(r.sell)}</td>
-    ${pc(r.sp,LIM[sz])}${pc(r.p1k,LIM.size_1k)}${pc(r.p100k,LIM.size_100k)}${pc(r.p1m,LIM.size_1m)}
-    <td>${price(r.mark)}</td><td>${compact(r.vol)}</td>
-    <td class="${r.age!==null&&r.age>600?"bad":""}">${ageStr(r.age)}</td></tr>`).join("")
-    ||`<tr><td colspan="10" class="na">No markets match “${$("q").value}”.</td></tr>`;
-  renderHead();
+  $("body").innerHTML=list.map(r=>{
+    const a=`<td>${r.ticker}<small>${r.name}</small></td>${T("Type",`<span class="tag">${r.typ}</span><small>${r.sub}</small>`)}`;
+    if(view==="spread") return `<tr>${a}${T("Buy",price(r.buy))}${T("Sell",price(r.sell))}${pc("Spread",r.sp,LIM[sz])}${pc("$1k",r.p1k,LIM.size_1k)}${pc("$100k",r.p100k,LIM.size_100k)}${pc("$1M",r.p1m,LIM.size_1m)}${T("Mark",price(r.mark))}${T("24h vol",compact(r.vol))}${T("Quote age",ageStr(r.age),r.age!==null&&r.age>600?"bad":"")}</tr>`;
+    const bar=r.lp===null?"–":`<span class="ls"><i style="width:${r.lp}%"></i></span>${r.lp.toFixed(1)}%`;
+    return `<tr>${a}${T("Total OI",compact(r.oi))}${T("Long OI",compact(r.lo),"good")}${T("Short OI",compact(r.so),"bad")}${T("Net long",compact(r.net),r.net>=0?"good":"bad")}${T("Long share",bar)}${T("Mark",price(r.mark))}${T("24h vol",compact(r.vol))}</tr>`;
+  }).join("")||`<tr><td colspan="11" class="na">No markets match these filters.</td></tr>`;
+  renderHead(); renderStats(list);
 }
-function renderStats(){
-  const v=rows.filter(r=>r.sp!==null).sort((a,b)=>a.sp-b.sp);
-  const med=v.length?v[Math.floor(v.length/2)].sp:null;
-  const items=[[rows.length,"markets loaded"],
-    [med===null?"–":med.toFixed(3)+"%","median spread"],
-    [v.length?`${v[0].ticker} ${v[0].sp.toFixed(3)}%`:"–","tightest"],
-    [v.length?`${v[v.length-1].ticker} ${v[v.length-1].sp.toFixed(3)}%`:"–","widest"],
-    [compact(num(general.total_volume_24h)),"24h volume"]];
+function renderStats(list){
+  let items;
+  if(view==="spread"){
+    const v=list.filter(r=>r.sp!==null).sort((a,b)=>a.sp-b.sp);
+    items=[[list.length,"markets shown"],[v.length?v[Math.floor(v.length/2)].sp.toFixed(3)+"%":"–","median spread"],
+      [v.length?`${v[0].ticker} ${v[0].sp.toFixed(3)}%`:"–","tightest"],[v.length?`${v[v.length-1].ticker} ${v[v.length-1].sp.toFixed(3)}%`:"–","widest"]];
+  }else{
+    const lo=list.reduce((s,r)=>s+r.lo,0), tot=list.reduce((s,r)=>s+r.oi,0);
+    const big=[...list].sort((a,b)=>b.oi-a.oi)[0];
+    items=[[list.length,"markets shown"],[compact(tot),"total OI"],[tot?(lo/tot*100).toFixed(1)+"% long":"–","long share"],[big?`${big.ticker} ${compact(big.oi)}`:"–","largest OI"]];
+  }
   $("stats").innerHTML=items.map(([a,l])=>`<div class="stat"><b>${a}</b><span>${l}</span></div>`).join("");
 }
-function setStatus(kind,text){$("dot").className="dot "+kind;$("status").textContent=text}
-function refreshView(){recompute();renderStats();render()}
+function setView(v){
+  view=v; $("v-spread").setAttribute("aria-pressed",v==="spread"); $("v-oi").setAttribute("aria-pressed",v==="oi");
+  sortKey=v==="spread"?"sp":"oi"; sortDir=v==="spread"?1:-1;
+  document.querySelectorAll("#size,#mode").forEach(e=>e.style.display=v==="spread"?"":"none");
+  render();
+}
+function setStatus(k,t){$("dot").className="dot "+k;$("status").textContent=t}
+function refreshView(){recompute();renderChips();render()}
 async function load(){
   $("msg").style.display="none"; setStatus("","Loading…");
   try{
@@ -180,16 +272,16 @@ async function load(){
   }
 }
 function schedule(){clearInterval(timer);const ms=+$("refresh").value;if(ms)timer=setInterval(load,ms)}
-$("head").addEventListener("click",e=>{
-  const th=e.target.closest("th"); if(!th) return;
-  const k=th.dataset.k;
-  if(k===sortKey) sortDir*=-1; else {sortKey=k;sortDir=1}
-  render();
-});
+function sortBy(k){ if(k===sortKey) sortDir*=-1; else {sortKey=k; sortDir=(k==="ticker"||k==="cat"||/^(sp|p1k|p100k|p1m|buy|sell|age)$/.test(k))?1:-1} render(); }
+$("head").addEventListener("click",e=>{const th=e.target.closest("th"); if(th) sortBy(th.dataset.k)});
 $("head").addEventListener("keydown",e=>{if(e.key==="Enter")e.target.click()});
+$("msort").addEventListener("change",e=>{sortKey=null;sortBy(e.target.value)});
+$("chips").addEventListener("click",e=>{const b=e.target.closest(".chip"); if(!b) return; const k=b.dataset.k,c=b.dataset.c; if(k==="g")grp=c; else if(k==="t")typ=c; else sub=c; renderChips(); render()});
+$("v-spread").addEventListener("click",()=>setView("spread"));
+$("v-oi").addEventListener("click",()=>setView("oi"));
 $("q").addEventListener("input",render);
-$("size").addEventListener("change",refreshView);
-$("mode").addEventListener("change",refreshView);
+["size","mode"].forEach(i=>$(i).addEventListener("change",refreshView));
+$("minoi").addEventListener("change",render);
 $("go").addEventListener("click",load);
 $("refresh").addEventListener("change",schedule);
 $("theme").addEventListener("click",()=>{
